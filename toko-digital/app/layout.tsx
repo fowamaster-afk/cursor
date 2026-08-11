@@ -3,6 +3,19 @@ import { Geist, Geist_Mono } from "next/font/google";
 import SsoReceiver from "@/components/SsoReceiver";
 import "./globals.css";
 
+const getSsoUrl = () => {
+  if (typeof window !== "undefined" && window.location.hostname !== "localhost") {
+    // Jika sudah online (di Vercel), arahkan ke URL SSO production Anda
+    return "https://cursor-8uhu.vercel.app//?source=toko"; 
+  }
+  // Jika masih di laptop
+  return "http://localhost:3000/?source=toko";
+};
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
