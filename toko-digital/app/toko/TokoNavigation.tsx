@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "@/services/supabaseClient";
 
 interface TokoNavigationProps {
   /**
@@ -46,10 +47,28 @@ function isMenuActive(pathname: string, href: string, exact: boolean): boolean {
  */
 export default function TokoNavigation({ onNavigate }: TokoNavigationProps) {
   const pathname = usePathname();
+  const router = useRouter();
 
   // Panggil callback penutup menu (jika disediakan) setiap kali user menavigasi.
   const handleNavigate = () => {
     onNavigate?.();
+  };
+
+  /**
+   * Logout dari area toko:
+   * - `supabase.auth.signOut()` menghapus sesi & storage autentikasi.
+   * - Kembali ke beranda publik, lalu `router.refresh()` agar Server
+   *   Components di-render ulang (mode logged-out).
+   */
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      onNavigate?.(); // tutup menu mobile bila sedang terbuka
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      console.error("Gagal logout:", err);
+    }
   };
 
   const linkClasses = (active: boolean) =>
@@ -97,6 +116,14 @@ export default function TokoNavigation({ onNavigate }: TokoNavigationProps) {
 
       <div className="mt-auto">
         <div className="my-3 h-px bg-gray-200" aria-hidden="true" />
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex w-full items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium text-red-600 transition-all duration-150 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1"
+        >
+          <span aria-hidden="true">🚪</span>
+          Keluar
+        </button>
         <Link
           href={HOME_HREF}
           onClick={handleNavigate}

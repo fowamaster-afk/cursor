@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { supabase } from "@/services/supabaseClient";
+import { getCurrentUser } from "@/services/authService";
 import { buildSsoLoginUrl } from "@/lib/sso";
 
 /** Ikon hati untuk menu Favorit. */
@@ -32,6 +35,32 @@ function HeartIcon() {
  */
 export default function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  // State user: null = belum login. Diisi dari sesi saat mount (client-side,
+  // karena sesi toko-digital tersimpan di localStorage browser, bukan cookie,
+  // sehingga tidak bisa dibaca dari Server Component).
+  const [user, setUser] = useState<{ id: string } | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Deteksi status login saat komponen dimuat.
+  useEffect(() => {
+    let active = true;
+    getCurrentUser()
+      .then((currentUser) => {
+        if (active) setUser(currentUser);
+      })
+      .catch(() => {
+        if (active) setUser(null);
+      })
+      .finally(() => {
+        if (active) setIsChecking(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const linkClass = (active: boolean) =>
     `inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -56,6 +85,26 @@ export default function Navbar() {
     const nextUrl = window.location.href;
     const loginUrl = buildSsoLoginUrl("toko", nextUrl);
     window.location.href = loginUrl;
+  };
+
+  /**
+   * Logout: hapus sesi Supabase (localStorage) lalu kembali ke beranda.
+   * `router.refresh()` memaksa Next.js me-render ulang Server Components
+   * agar UI (mis. daftar produk) kembali ke mode logged-out.
+   */
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await supabase.auth.signOut(); // hapus sesi & storage autentikasi
+      setUser(null);
+      router.push("/");
+      router.refresh();
+    } catch (err) {
+      console.error("Gagal logout:", err);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -86,14 +135,29 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Tombol Masuk */}
-        <button
-          type="button"
-          onClick={handleLogin}
-          className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-        >
-          Masuk
-        </button>
+        {/* Tombol Masuk / Keluar (berdasarkan status login) */}
+        {isChecking ? (
+          <span className="inline-flex h-10 w-24 items-center justify-center">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-600" />
+          </span>
+        ) : user ? (
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60"
+          >
+            {isLoggingOut ? "Memproses..." : "Keluar"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleLogin}
+            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            Masuk
+          </button>
+        )}
       </div>
 
       {/* Menu utama (mobile) */}
