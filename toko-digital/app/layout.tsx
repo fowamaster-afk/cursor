@@ -11,10 +11,6 @@ const getSsoUrl = () => {
   // Jika masih di laptop
   return "http://localhost:3000/?source=toko";
 };
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
