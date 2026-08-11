@@ -20,16 +20,16 @@ const getSsoLoginUrl = () => {
 
 // Gunakan fungsi di dalam komponen atau variabel konstan
 const SSO_LOGIN_URL = getSsoLoginUrl();
-
+    
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
-}); // <--- Pastikan kurung ini ada
+});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-}); // <--- Pastikan kurung ini ada
+});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -44,6 +44,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+        <SsoReceiver />
         {children}
       </body>
     </html>
