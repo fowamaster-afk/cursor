@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import SsoReceiver from "@/components/SsoReceiver";
 import "./globals.css";
 
+const ssoLoginUrl = `${process.env.NEXT_PUBLIC_SSO_URL || "http://localhost:3000"}/?source=toko&next=${encodeURIComponent(window.location.origin)}`;
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
