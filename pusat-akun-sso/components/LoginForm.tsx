@@ -137,15 +137,18 @@ export default function LoginForm() {
     }
   }, [isLoading, user, redirectAfterLogin]);
 
-  /** Tujuan OAuth Google: origin + `?next=` (bila aman) agar SSO tetap jalan. */
+  /**
+   * Tujuan OAuth Google: `/auth/callback` + `?next=` (bila ada) — praktik
+   * terbaik SSR. Supabase mengarahkan kembali ke Route Handler `/auth/callback`
+   * yang menukar `code` menjadi sesi di SERVER (`exchangeCodeForSession`).
+   */
   const buildGoogleRedirectTo = (): string => {
-    const next = getSafeNextUrl(searchParams.get("next"), window.location.origin);
+    const next = searchParams.get("next");
+    const url = new URL("/auth/callback", window.location.origin);
     if (next) {
-      const url = new URL(window.location.origin);
       url.searchParams.set("next", next);
-      return url.toString();
     }
-    return window.location.origin;
+    return url.toString();
   };
 
   /** Memulai login dengan Google, meneruskan tujuan dari `?next=`. */

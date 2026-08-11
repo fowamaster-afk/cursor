@@ -99,25 +99,6 @@ export async function registerWithEmail(email: string, password: string): Promis
 }
 
 /**
- * Menukar kode otorisasi PKCE menjadi sesi aktif.
- *
- * Dipanggil pada halaman callback setelah Supabase mengarahkan kembali dengan
- * parameter `?code=`. Kode ini bersifat sekali pakai (single-use) — begitu
- * ditukar berhasil, kode yang sama tidak dapat dipakai lagi.
- *
- * @param code Kode otorisasi dari URL callback.
- * @returns `void` setelah sesi berhasil dibentuk.
- * @throws `Error` apabila kode tidak valid / sudah kedaluwarsa.
- */
-export async function exchangeCodeForSession(code: string): Promise<void> {
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
-
-  if (error) {
-    throw new Error(`Gagal menukar kode otorisasi: ${error.message}`);
-  }
-}
-
-/**
  * Keluar dari sesi aktif pengguna.
  *
  * @returns `void` setelah proses keluar berhasil.
