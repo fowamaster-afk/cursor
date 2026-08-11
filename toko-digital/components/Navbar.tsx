@@ -69,7 +69,7 @@ export default function Navbar() {
 
         {/* Tombol Masuk */}
         <a
-          href="http://localhost:3000/?source=toko&next=http://localhost:3001/"
+          href="https://cursor-orpin-two.vercel.app/?source=toko&next=https://cursor-8uhu.vercel.app/"
           className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         >
           Masuk
