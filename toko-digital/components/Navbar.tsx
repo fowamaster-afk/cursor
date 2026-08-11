@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { buildSsoLoginUrl } from "@/lib/sso";
 
 /** Ikon hati untuk menu Favorit. */
 function HeartIcon() {
@@ -39,6 +40,24 @@ export default function Navbar() {
         : "text-gray-700 hover:bg-gray-100"
     }`;
 
+  /**
+   * Mengarahkan pengguna ke halaman login Pusat Akun SSO.
+   *
+   * - Base URL dibaca dari env `NEXT_PUBLIC_SSO_URL`
+   *   (fallback: http://localhost:3000 untuk development).
+   * - Query `?source=toko` menandakan aplikasi asal.
+   * - Query `&next=` berisi URL dinamis lokasi saat ini agar setelah login
+   *   pengguna kembali ke halaman yang sama.
+   *
+   * Hanya dieksekusi saat tombol diklik (client-side), sehingga aman dari
+   * error "window is not defined" pada saat SSR / prerender.
+   */
+  const handleLogin = () => {
+    const nextUrl = window.location.href;
+    const loginUrl = buildSsoLoginUrl("toko", nextUrl);
+    window.location.href = loginUrl;
+  };
+
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
@@ -68,12 +87,13 @@ export default function Navbar() {
         </div>
 
         {/* Tombol Masuk */}
-        <a
-          href="https://cursor-orpin-two.vercel.app/?source=toko&next=https://cursor-8uhu.vercel.app/"
+        <button
+          type="button"
+          onClick={handleLogin}
           className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         >
           Masuk
-        </a>
+        </button>
       </div>
 
       {/* Menu utama (mobile) */}

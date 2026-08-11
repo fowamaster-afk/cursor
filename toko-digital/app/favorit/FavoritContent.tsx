@@ -4,10 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import ProductCard from "@/components/ProductCard";
 import { getCurrentUser } from "@/services/authService";
 import { getUserFavorites } from "@/services/favoriteService";
+import { buildSsoLoginUrl } from "@/lib/sso";
 import type { Product } from "@/types/product";
-
-// URL SSO tujuan (port 3000) - sumber/fitur: favorit
-const SSO_LOGIN_URL = "http://localhost:3000/?source=favorit";
 
 /**
  * Konten halaman Koleksi Favorit (Client Component).
@@ -34,8 +32,8 @@ export default function FavoritContent() {
 
         // Belum login -> siapkan redirect ke halaman login SSO (sekali saja).
         if (!user) {
-          const next = encodeURIComponent(window.location.href);
-          const target = `${SSO_LOGIN_URL}&next=${next}`;
+          const next = window.location.href;
+          const target = buildSsoLoginUrl("favorit", next);
           if (redirectTargetRef.current === target) return;
           redirectTargetRef.current = target;
 

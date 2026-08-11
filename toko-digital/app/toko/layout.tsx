@@ -3,10 +3,8 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { getCurrentUser } from "@/services/authService";
+import { buildSsoLoginUrl } from "@/lib/sso";
 import TokoNavigation from "./TokoNavigation";
-
-// URL SSO tujuan (port 3000)
-const SSO_LOGIN_URL = "http://localhost:3000/?source=toko";
 
 /**
  * Pengaman auth untuk area toko (Client Component).
@@ -33,14 +31,13 @@ function TokoAuthGuard({ children }: { children: React.ReactNode }) {
   const fullUrl = `${pathname}?${searchParams.toString()}`;
 
   /**
-   * Mengarahkan ke halaman login SSO (port 3000).
+   * Mengarahkan ke halaman login SSO.
+   * Base URL dibaca dari env `NEXT_PUBLIC_SSO_URL` (fallback localhost:3000).
    * Hanya sekali — dicegah dengan ref agar tidak memicu loop.
    */
   const goToLogin = useCallback(() => {
-    const next = encodeURIComponent(
-      typeof window !== "undefined" ? window.location.href : fullUrl
-    );
-    const target = `${SSO_LOGIN_URL}&next=${next}`;
+    const next = typeof window !== "undefined" ? window.location.href : fullUrl;
+    const target = buildSsoLoginUrl("toko", next);
 
     // Cegah redirect berulang ke URL yang sama
     if (redirectTargetRef.current === target) return;

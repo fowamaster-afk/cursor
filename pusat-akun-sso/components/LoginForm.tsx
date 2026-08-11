@@ -65,7 +65,12 @@ export default function LoginForm() {
   /** Guard anti double-invoke untuk auto-redirect (mencegah infinite loop). */
   const redirectedRef = useRef(false);
 
-  /** Tujuan kepulangan dari `?next=` (bisa null bila tidak disediakan). */
+  /**
+   * Tujuan kepulangan dari parameter URL `?next=` (di-encode oleh aplikasi
+   * asal, mis. toko-digital). Nilai otomatis di-decode oleh `useSearchParams`,
+   * sehingga di sini sudah berupa URL absolut yang valid, atau `null` bila
+   * tidak disediakan.
+   */
   const nextUrl = searchParams.get("next");
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
@@ -79,6 +84,12 @@ export default function LoginForm() {
    *  - State `redirecting` di-set agar UI berubah menjadi "Mengalihkan...".
    */
   const redirectAfterLogin = useCallback(async () => {
+    // Guard anti double-invoke: mencegah redirect ganda (mis. dipanggil dari
+    // `handleSubmit` DAN dari efek sesi aktif di bawah sekaligus).
+    if (redirectedRef.current) return;
+    redirectedRef.current = true;
+
+    // Baca tujuan dari parameter URL `?next=` dan validasi keamanannya.
     const next = getSafeNextUrl(nextUrl, window.location.origin);
 
     if (!next) {
@@ -114,11 +125,15 @@ export default function LoginForm() {
   // Saat sesi aktif terdeteksi, periksa tujuan:
   //  - ada `?next=`  → auto redirect ke aplikasi tujuan.
   //  - tanpa `?next=` → tampilkan UI "Selamat datang kembali!"
-  // Guard `redirectedRef` mencegah auto-redirect terpanggil ganda.
+  // Guard anti double-invoke ditangani di dalam `redirectAfterLogin`.
+  // Dipanggil lewat setTimeout agar setState tidak terjadi sinkron di dalam
+  // effect (memenuhi aturan react-hooks/set-state-in-effect).
   useEffect(() => {
-    if (!isLoading && user && !redirectedRef.current) {
-      redirectedRef.current = true;
-      void redirectAfterLogin();
+    if (!isLoading && user) {
+      const timer = setTimeout(() => {
+        void redirectAfterLogin();
+      }, 0);
+      return () => clearTimeout(timer);
     }
   }, [isLoading, user, redirectAfterLogin]);
 
