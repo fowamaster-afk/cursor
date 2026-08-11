@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { exchangeCodeForSession } from "@/services/authService";
 import { supabase } from "@/services/supabaseClient";
-import { getSafeNextUrl } from "@/utils/redirect";
 
 /**
  * components/AuthCallbackHandler.tsx
@@ -16,19 +15,30 @@ import { getSafeNextUrl } from "@/utils/redirect";
  *
  *     /?code=<PKCE_CODE>&next=https://toko-domain...
  *
- * Komponen ini bertugas:
- *   1. Membaca parameter `code` dan `next` dari URL via `useSearchParams`.
+ * Alur komponen:
+ *   1. Membaca `code` dan `next` dari URL via `useSearchParams`.
  *   2. Menukar `code` menjadi sesi aktif via `exchangeCodeForSession`.
- *   3. Membersihkan URL (menghapus `code`) — kode PKCE hanya sekali pakai,
- *      sehingga refresh halaman tidak boleh menukar ulang kode yang sama.
- *   4. Mengalihkan user ke tujuan `next` (setelah validasi keamanan anti
- *      open-redirect), atau ke `/dashboard` bila tidak ada tujuan yang valid.
+ *   3. Berhasil  → redirect ke tujuan `next` memakai
+ *      `window.location.href = decodeURIComponent(next)`; bila `next` kosong,
+ *      tampilkan pesan "Login Berhasil" tanpa melakukan redirect.
+ *   4. Gagal     → tampilkan pesan error asli di UI.
  *
- * Saat TIDAK ada parameter `code`, komponen merender `null` sehingga form
- * login normal (`LoginForm`) tetap tampil.
+ * Guard `hasExchanged` (useRef):
+ *   Kode PKCE bersifat SINGLE-USE. Guard ini memastikan blok pertukaran hanya
+ *   dijalankan sekali per instance — mencegah kode hangus karena double-
+ *   execution (mis. React StrictMode menjalankan effect dua kali di dev, atau
+ *   komponen di-render ulang).
  */
 
-type CallbackStatus = "idle" | "processing" | "error";
+/** Menghapus parameter callback (`code`, `next`) dari URL tanpa reload. */
+function clearCallbackQueryParams(): void {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("code");
+  url.searchParams.delete("next");
+  window.history.replaceState({}, "", url.toString());
+}
+
+type CallbackStatus = "idle" | "processing" | "success" | "error";
 
 export default function AuthCallbackHandler() {
   const router = useRouter();
@@ -42,79 +52,82 @@ export default function AuthCallbackHandler() {
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Guard agar proses pertukaran hanya dijalankan sekali (mencegah double
-  // invoke dari StrictMode di development maupun remount lainnya).
-  const processedRef = useRef(false);
+  /**
+   * Saklar sekali jalan (anti double-execution).
+   * useRef tidak memicu re-render dan nilainya bertahan antar render pada
+   * instance yang sama — tepat untuk mencegah pertukaran kode dua kali.
+   */
+  const hasExchanged = useRef(false);
 
   useEffect(() => {
-    if (!code || processedRef.current) return;
-    processedRef.current = true;
+    // Tidak ada kode di URL → diam; form login normal yang tampil.
+    if (!code) return;
+
+    // Blok pertukaran HANYA dijalankan jika kode belum pernah diproses.
+    if (hasExchanged.current) return;
+
+    // Tandai segera (sinkron, sebelum `await`) agar eksekusi kedua apapun
+    // (StrictMode di dev / render ulang) langsung berhenti di sini — kode
+    // PKCE yang single-use tidak akan pernah ditukar dua kali.
+    hasExchanged.current = true;
 
     // `code` sudah dipastikan ada (string) setelah guard di atas; simpan ke
     // const baru agar narrowing tetap berlaku di dalam fungsi bertingkat.
     const authCode = code;
 
-    async function handleCallback() {
+    async function runExchange() {
       try {
         // 1) Tukar kode otorisasi PKCE menjadi sesi aktif.
         await exchangeCodeForSession(authCode);
 
-        // 2) Sesi terbentuk -> selesaikan redirect.
-        finishRedirect();
-      } catch {
-        // Kasus race condition: browser client Supabase (`detectSessionInUrl`)
-        // mungkin sudah menukar kode terlebih dahulu, sehingga pemanggilan
-        // eksplisit di atas gagal ("code already used"). Bila sesi sudah aktif,
-        // tetap lanjutkan redirect seperti biasa.
+        // 2) Bersihkan `code` dari URL agar tidak ditukar ulang saat refresh.
+        clearCallbackQueryParams();
+
+        // 3) Bila `next` ada → redirect langsung ke tujuan.
+        if (rawNext) {
+          // `decodeURIComponent` menangani nilai `next` yang di-encode dua
+          // kali; dibungkus try/catch agar URI dengan `%` invalid aman.
+          let target = rawNext;
+          try {
+            target = decodeURIComponent(rawNext);
+          } catch {
+            // Nilai mengandung `%` tidak valid → pakai nilai aslinya.
+          }
+          window.location.href = target;
+          return;
+        }
+
+        // 4) Tanpa `next` → tampilkan pesan "Login Berhasil" (tanpa redirect).
+        setStatus("success");
+      } catch (err) {
+        // Race condition: browser client (`detectSessionInUrl`) mungkin sudah
+        // menukar kode lebih dulu sehingga panggilan eksplisit di atas gagal
+        // ("code already used"). Bila sesi sudah aktif → anggap berhasil.
         const {
           data: { session },
         } = await supabase.auth.getSession();
 
         if (session) {
-          finishRedirect();
+          clearCallbackQueryParams();
+          setStatus("success");
           return;
         }
 
-        // Tidak ada sesi valid -> tampilkan error agar user bisa mencoba lagi.
+        // Kode benar-benar salah / kedaluwarsa → tampilkan pesan error asli.
+        clearCallbackQueryParams();
         setErrorMessage(
-          "Gagal memproses login. Kode otorisasi tidak valid atau telah kedaluwarsa. Silakan coba login kembali."
+          err instanceof Error
+            ? err.message
+            : "Gagal memproses login. Silakan coba login kembali."
         );
         setStatus("error");
       }
     }
 
-    function finishRedirect() {
-      // 3) Bersihkan URL: hapus `code` & `next` agar tidak terjadi pertukaran
-      //    ulang saat halaman di-refresh.
-      const url = new URL(window.location.href);
-      url.searchParams.delete("code");
-      url.searchParams.delete("next");
-      window.history.replaceState({}, "", url.toString());
+    void runExchange();
+  }, [code, rawNext]);
 
-      // 4) Validasi keamanan tujuan (anti open-redirect) sebelum redirect.
-      const next = getSafeNextUrl(rawNext, window.location.origin);
-
-      if (next) {
-        // Redirect langsung ke aplikasi tujuan. `decodeURIComponent` menangani
-        // nilai `next` yang di-encode dua kali.
-        let target = next;
-        try {
-          target = decodeURIComponent(next);
-        } catch {
-          // Nilai mengandung `%` tidak valid -> pakai nilai aslinya.
-        }
-        window.location.href = target;
-        return;
-      }
-
-      // Tidak ada tujuan yang valid -> kembali ke dashboard SSO.
-      router.replace("/dashboard");
-    }
-
-    void handleCallback();
-  }, [code, rawNext, router]);
-
-  // Tidak ada kode di URL -> biarkan form login normal yang tampil.
+  // Tidak ada kode di URL → biarkan form login normal yang tampil.
   if (status === "idle") return null;
 
   return (
@@ -124,7 +137,7 @@ export default function AuthCallbackHandler() {
         className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/70 to-transparent"
       />
 
-      {status === "processing" ? (
+      {status === "processing" && (
         <div className="flex flex-col items-center justify-center py-10 text-center">
           {/* Spinner loading */}
           <div className="relative">
@@ -142,7 +155,39 @@ export default function AuthCallbackHandler() {
             Sebentar, Anda akan dialihkan ke aplikasi tujuan.
           </p>
         </div>
-      ) : (
+      )}
+
+      {status === "success" && (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          {/* Ikon sukses */}
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-green-300/30 bg-green-500/20">
+            <svg
+              className="h-7 w-7 text-green-300"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="mt-6 text-2xl font-semibold tracking-tight text-white">
+            Login Berhasil
+          </h2>
+          <p className="mt-2 text-sm font-light text-white/70">
+            Anda berhasil masuk. Silakan lanjutkan ke dashboard Anda.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.replace("/dashboard")}
+            className="mt-8 w-full max-w-xs rounded-xl border border-white/30 bg-white/10 px-4 py-3 text-sm font-semibold tracking-wide text-white backdrop-blur-sm transition-all duration-200 hover:bg-white hover:text-slate-900 active:scale-[0.99]"
+          >
+            Lanjut ke Dashboard
+          </button>
+        </div>
+      )}
+
+      {status === "error" && (
         <div className="flex flex-col items-center justify-center py-10 text-center">
           {/* Ikon error */}
           <div className="flex h-14 w-14 items-center justify-center rounded-full border border-red-300/30 bg-red-500/20">
@@ -158,7 +203,7 @@ export default function AuthCallbackHandler() {
             </svg>
           </div>
           <h2 className="mt-6 text-2xl font-semibold tracking-tight text-white">
-            Login gagal
+            Login Gagal
           </h2>
           <p className="mt-2 max-w-xs break-words text-sm font-light text-white/70">
             {errorMessage}
