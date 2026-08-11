@@ -44,6 +44,21 @@ function decodeNext(value: string): string {
   }
 }
 
+/**
+ * Respons yang menulis cookie auth TIDAK boleh di-cache oleh CDN / proxy
+ * (sesuai panduan `@supabase/ssr`), agar sesi satu user tidak tersaji ke
+ * user lain.
+ */
+function withNoCache(response: NextResponse): NextResponse {
+  response.headers.set(
+    "Cache-Control",
+    "private, no-cache, no-store, must-revalidate, max-age=0"
+  );
+  response.headers.set("Expires", "0");
+  response.headers.set("Pragma", "no-cache");
+  return response;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -51,19 +66,34 @@ export async function GET(request: NextRequest) {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
       // Pertukaran berhasil → arahkan ke tujuan `next` bila valid.
       const next = rawNext ? decodeNext(rawNext) : null;
 
       if (next && isSafeRedirectTarget(next)) {
-        // `new URL(next, origin)` menangani path relatif maupun URL absolut.
-        return NextResponse.redirect(new URL(next, origin));
+        const target = new URL(next, origin);
+
+        // Path internal → sesi dibagikan via cookie (sama origin); redirect
+        // langsung tanpa token.
+        if (!next.startsWith("/")) {
+          // Lintas origin → SSO Bridge: teruskan token sesi agar aplikasi
+          // tujuan (mis. toko) bisa membangun sesinya sendiri via
+          // `supabase.auth.setSession()` (lihat SsoReceiver di toko-digital).
+          if (data.session?.access_token) {
+            target.searchParams.set("access_token", data.session.access_token);
+          }
+          if (data.session?.refresh_token) {
+            target.searchParams.set("refresh_token", data.session.refresh_token);
+          }
+        }
+
+        return withNoCache(NextResponse.redirect(target));
       }
 
       // Tanpa `next` yang valid → fallback ke halaman utama (origin).
-      return NextResponse.redirect(origin);
+      return withNoCache(NextResponse.redirect(origin));
     }
   }
 
@@ -72,3 +102,4 @@ export async function GET(request: NextRequest) {
   errorUrl.searchParams.set("auth_error", "exchange_failed");
   return NextResponse.redirect(errorUrl);
 }
+

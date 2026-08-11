@@ -33,6 +33,10 @@ export async function createClient(): Promise<SupabaseClient> {
       getAll() {
         return cookieStore.getAll();
       },
+      // Catatan: `@supabase/ssr` juga mengirim parameter `headers`
+      // (Cache-Control/Expires/Pragma) saat menulis cookie auth — header
+      // tersebut tidak bisa di-set lewat `cookies()`, sehingga diterapkan
+      // pada respons di route handler (lihat `app/auth/callback/route.ts`).
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {

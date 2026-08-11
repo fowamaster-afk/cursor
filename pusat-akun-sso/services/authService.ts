@@ -65,6 +65,32 @@ export async function loginWithGoogle(redirectTo?: string): Promise<void> {
 }
 
 /**
+ * Login menggunakan Magic Link (email OTP).
+ *
+ * Supabase mengirimkan email berisi link ke `redirectTo`; saat link diklik,
+ * browser diarahkan ke `/auth/callback` (Route Handler server) untuk menukar
+ * `code` menjadi sesi aktif.
+ *
+ * @param email      Alamat email tujuan magic link.
+ * @param redirectTo URL callback SSO — harus mengarah ke
+ *                   `.../auth/callback?next=<URL_TUJUAN>` (mis. dari
+ *                   `buildGoogleRedirectTo` di LoginForm).
+ * @throws `Error` apabila gagal mengirim magic link.
+ */
+export async function loginWithMagicLink(email: string, redirectTo?: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: redirectTo,
+    },
+  });
+
+  if (error) {
+    throw new Error(`Gagal mengirim magic link: ${error.message}`);
+  }
+}
+
+/**
  * Registrasi akun baru dengan email dan kata sandi.
  *
  * @param email    Alamat email pengguna.

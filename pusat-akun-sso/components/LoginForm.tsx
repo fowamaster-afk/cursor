@@ -138,13 +138,17 @@ export default function LoginForm() {
   }, [isLoading, user, redirectAfterLogin]);
 
   /**
-   * Tujuan OAuth Google: `/auth/callback` + `?next=` (bila ada) — praktik
-   * terbaik SSR. Supabase mengarahkan kembali ke Route Handler `/auth/callback`
-   * yang menukar `code` menjadi sesi di SERVER (`exchangeCodeForSession`).
+   * Tujuan OAuth Google: `/auth/callback` + `?next=<URL_TOKO_DINAMIS>`.
+   *
+   * Base URL SSO diambil dari `NEXT_PUBLIC_SSO_BASE_URL` bila diatur, selain
+   * itu origin saat ini (mis. `https://cursor-8uhu.vercel.app`). Supabase
+   * mengarahkan kembali ke Route Handler `/auth/callback` yang menukar `code`
+   * menjadi sesi di SERVER (`exchangeCodeForSession`).
    */
   const buildGoogleRedirectTo = (): string => {
+    const base = process.env.NEXT_PUBLIC_SSO_BASE_URL || window.location.origin;
     const next = searchParams.get("next");
-    const url = new URL("/auth/callback", window.location.origin);
+    const url = new URL("/auth/callback", base);
     if (next) {
       url.searchParams.set("next", next);
     }
