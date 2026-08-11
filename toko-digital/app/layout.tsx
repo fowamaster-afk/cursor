@@ -5,12 +5,21 @@ import "./globals.css";
 
 const getSsoUrl = () => {
   if (typeof window !== "undefined" && window.location.hostname !== "localhost") {
-    // Jika sudah online (di Vercel), arahkan ke URL SSO production Anda
-    return "https://cursor-8uhu.vercel.app//?source=toko"; 
-  }
-  // Jika masih di laptop
-  return "http://localhost:3000/?source=toko";
+    // 1. Ambil origin saat ini secara otomatis (mendukung localhost maupun Vercel)
+const getSsoLoginUrl = () => {
+  const isProduction = typeof window !== "undefined" && window.location.hostname !== "localhost";
+  
+  // URL SSO saat online (Ganti dengan domain Vercel pusat-akun-sso Anda nanti, atau gunakan env var)
+  const baseSsoUrl = process.env.NEXT_PUBLIC_SSO_URL || "http://localhost:3000";
+  
+  // Tentukan URL tujuan kembali (callback) ke aplikasi toko saat ini
+  const currentOrigin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3001";
+
+  return `${baseSsoUrl}/?source=toko&next=${encodeURIComponent(currentOrigin)}`;
 };
+
+// Gunakan fungsi di dalam komponen atau variabel konstan
+const SSO_LOGIN_URL = getSsoLoginUrl();
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
