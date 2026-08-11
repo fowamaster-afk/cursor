@@ -5,7 +5,7 @@ import "./globals.css";
 const getSsoUrl = () => {
   if (typeof window !== "undefined" && window.location.hostname !== "localhost") {
     // Jika sudah online (di Vercel), arahkan ke URL SSO production Anda
-    return "https://pusat-akun-sso-anda.vercel.app/?source=toko"; 
+    return "https://cursor-8uhu.vercel.app//?source=toko"; 
   }
   // Jika masih di laptop
   return "http://localhost:3000/?source=toko";
