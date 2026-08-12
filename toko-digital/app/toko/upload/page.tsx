@@ -89,8 +89,15 @@ export default function tokoUploadPage() {
       alert("Produk berhasil ditambahkan!");
       router.push("/toko");
     } catch (err) {
-      console.error("Gagal membuat produk:", err);
-      setError("Terjadi kesalahan saat menambahkan produk. Silakan coba lagi.");
+      // === DEBUG SEMENTARA: tampilkan penyebab asli dari Supabase ===
+      console.error("DETAIL ERROR menambahkan produk:", err);
+
+      // Pesan asli (dari upload gambar / insert products) diubah jadi string
+      // yang bisa dibaca manusia dan ditampilkan langsung di UI + alert.
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error("Pesan error (string):", errorMessage);
+      setError(`Gagal menambahkan produk: ${errorMessage}`);
+      alert(`Gagal menambahkan produk: ${errorMessage}`);
     } finally {
       setSubmitting(false);
     }

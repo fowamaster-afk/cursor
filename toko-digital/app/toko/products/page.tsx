@@ -42,9 +42,11 @@ export default function TokoProductsPage() {
         const userProducts = await getProductsByVendor(session.user.id);
         if (active) setProducts(userProducts);
       } catch (err) {
-        console.error("Gagal memuat produk toko:", err);
+        // === DEBUG SEMENTARA: log detail & tampilkan pesan error asli ===
+        console.error("DETAIL ERROR memuat produk (Produk Saya):", err);
         if (active) {
-          setError("Terjadi kesalahan saat memuat produk.");
+          const message = err instanceof Error ? err.message : String(err);
+          setError(`Terjadi kesalahan saat memuat produk: ${message}`);
         }
       } finally {
         if (active) setLoading(false);

@@ -31,11 +31,15 @@ export interface ProductCreateInput {
   /** Stok produk (kolom `stock`). Default 0 bila tidak disediakan. */
   stock?: number;
   image_url: string;
+  /**
+   * ID user pemilik produk (kolom `user_id` di tabel products).
+   * WAJIB - diambil dari sesi pengguna yang sedang login.
+   */
+  user_id: string;
   // Bidang lawas (tidak ada di tabel saat ini) - diabaikan saat insert.
   category?: string;
   seller_wa?: string;
   image_urls?: string[];
-  user_id?: string;
 }
 
 /** Payload untuk memperbarui produk. Semua field opsional. */
@@ -85,7 +89,7 @@ export function mapProduct(row: ProductRow): Product {
 export async function getProducts(searchQuery?: string): Promise<Product[]> {
   let builder = supabase
     .from("products")
-    .select("id, name, description, price, stock, image_url, created_at");
+    .select("id, name, description, price, stock, image_url, user_id, created_at");
 
   // Filter pencarian (tidak case-sensitive) pada name & description.
   // PostgREST `.or()` menggabungkan dua kondisi dengan OR; `%` = wildcard.
@@ -117,7 +121,7 @@ export async function getProductById(id: string): Promise<Product | null> {
 
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, description, price, stock, image_url, created_at")
+    .select("id, name, description, price, stock, image_url, user_id, created_at")
     .eq("id", id)
     .single();
 
@@ -134,16 +138,17 @@ export async function getProductById(id: string): Promise<Product | null> {
  * Dipakai di area Dashboard Toko untuk halaman "Produk Saya".
  */
 export async function getProductsByVendor(userId: string): Promise<Product[]> {
-  // Catatan: kolom `user_id` belum ada di tabel products saat ini, sehingga
-  // query ini akan error sampai kolom tersebut ditambahkan ke database.
+  // Kolom `user_id` (pemilik produk) kini tersedia; filter di bawah menampilkan
+  // hanya produk milik penjual yang sedang login.
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, description, price, stock, image_url, created_at")
+    .select("id, name, description, price, stock, image_url, user_id, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Gagal mengambil produk toko:", error.message);
+    // Log objek error LENGKAP dari Supabase: message, code, details, hint, status.
+    console.error("DETAIL ERROR getProductsByVendor (select + eq user_id):", error);
     throw new Error(`Gagal mengambil produk toko: ${error.message}`);
   }
 
@@ -155,16 +160,17 @@ export async function getProductsByVendor(userId: string): Promise<Product[]> {
  * Mirror dari getProductsByVendor namun untuk etalase publik profil penjual.
  */
 export async function getProductsByAuthor(userId: string): Promise<Product[]> {
-  // Catatan: kolom `user_id` belum ada di tabel products saat ini, sehingga
-  // query ini akan error sampai kolom tersebut ditambahkan ke database.
+  // Kolom `user_id` (pemilik produk) kini tersedia; filter di bawah menampilkan
+  // etalase publik untuk satu penjual/author.
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, description, price, stock, image_url, created_at")
+    .select("id, name, description, price, stock, image_url, user_id, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Gagal mengambil produk penjual:", error.message);
+    // Log objek error LENGKAP dari Supabase: message, code, details, hint, status.
+    console.error("DETAIL ERROR getProductsByAuthor (select + eq user_id):", error);
     throw new Error(`Gagal mengambil produk penjual: ${error.message}`);
   }
 
@@ -185,7 +191,10 @@ export async function uploadProductImages(files: File[]): Promise<string[]> {
       .upload(uniqueFileName, file);
 
     if (error) {
-      console.error("Gagal meng-upload gambar:", error.message);
+      // Log objek error lengkap dari Supabase Storage (berisi `message`,
+      // `statusCode`, `code`, `details`, `hint`) untuk diagnosis RLS.
+      console.error("DETAIL ERROR upload gambar ke Supabase Storage:", error);
+      console.error("Pesan upload gambar:", error.message);
       throw new Error(`Gagal meng-upload gambar: ${error.message}`);
     }
 
@@ -215,16 +224,21 @@ export async function createProduct(
     price: payload.price,
     stock: payload.stock ?? 0,
     image_url: payload.image_url,
+    // Pemilik produk: dikirim dari sesi login oleh halaman upload.
+    user_id: payload.user_id,
   };
 
   const { data, error } = await supabase
     .from("products")
     .insert(insert)
-    .select("id, name, description, price, stock, image_url, created_at")
+    .select("id, name, description, price, stock, image_url, user_id, created_at")
     .single();
 
   if (error) {
-    console.error("Gagal membuat produk:", error.message);
+    // Log objek error lengkap dari Supabase (berisi `message`, `statusCode`,
+    // `code`, `details`, `hint`) untuk diagnosis RLS.
+    console.error("DETAIL ERROR insert ke tabel products:", error);
+    console.error("Pesan insert products:", error.message);
     throw new Error(`Gagal membuat produk: ${error.message}`);
   }
 
