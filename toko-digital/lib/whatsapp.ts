@@ -39,10 +39,8 @@ export function buildWhatsAppMessage({
   productUrl,
 }: WhatsAppMessageInput): string {
   return [
-    `Halo ${storeName}, saya tertarik untuk memesan produk berikut:`,
+    `Halo, saya ingin memesan *${productTitle}* seharga ${formatRupiah(price)} dari ${storeName}.`,
     "",
-    `📦 *${productTitle}*`,
-    `💰 Harga: ${formatRupiah(price)}`,
     `🔗 Link Produk: ${productUrl}`,
     "",
     "Apakah stok barang ini masih tersedia? Terima kasih!",

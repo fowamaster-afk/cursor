@@ -7,19 +7,14 @@ import { formatRupiah } from "@/lib/whatsapp";
 /**
  * ProductCard - kartu produk untuk etalase toko.
  *
- * Client Component (karena tombol "Tambah ke Keranjang" butuh interaksi),
- * namun data produk tetap dikirim dari Server Component halaman, sehingga
- * halaman tetap SEO-friendly & cepat (fetch dilakukan di server).
+ * Menampilkan gambar, nama, harga (Rupiah), deskripsi singkat, dan tombol
+ * "Detail Produk" yang mengarah ke halaman /product/[id].
+ *
+ * Tetap berlabel Client Component karena komponen ini juga dirender di
+ * dalam Client Components (mis. halaman favorit), namun data produk selalu
+ * dikirim dari Server Component halaman sehingga halaman tetap SEO-friendly.
  */
 export default function ProductCard({ product }: { product: Product }) {
-  /**
-   * Untuk saat ini hanya mencatat id produk ke konsol.
-   * Nanti di sini bisa dihubungkan ke keranjang (state global / database).
-   */
-  const handleAddToCart = () => {
-    console.log("Tambah ke keranjang:", product.id);
-  };
-
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       {/* Gambar produk (dapat diklik menuju halaman detail) */}
@@ -54,18 +49,17 @@ export default function ProductCard({ product }: { product: Product }) {
           {product.description}
         </p>
 
-        {/* Harga (format Rupiah) + tombol tambah ke keranjang */}
+        {/* Harga (format Rupiah) + tombol menuju halaman detail */}
         <div className="mt-4 flex items-center justify-between gap-3">
           <span className="text-lg font-bold text-indigo-600">
             {formatRupiah(product.price)}
           </span>
-          <button
-            type="button"
-            onClick={handleAddToCart}
+          <Link
+            href={`/product/${product.id}`}
             className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
-            Tambah ke Keranjang
-          </button>
+            Detail Produk
+          </Link>
         </div>
       </div>
     </article>
