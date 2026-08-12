@@ -8,8 +8,8 @@ import {
   uploadProductImages,
 } from "@/services/productService";
 
-/** Dropdown kategori yang tersedia untuk produk. */
-const CATEGORIES = ["Digital", "Fisik", "Jasa"];
+/** Kategori produk yang tersedia (Fisik / Digital / Jasa). */
+const CATEGORIES = ["Fisik", "Digital", "Jasa"];
 
 /**
  * Form Upload Produk untuk toko.
@@ -197,21 +197,36 @@ export default function tokoUploadPage() {
 
         {/* Kategori */}
         <div>
-          <label htmlFor="category" className={labelClass}>
-            Kategori
-          </label>
-          <select
-            id="category"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className={inputClass}
+          <span className={labelClass}>Kategori</span>
+          <div
+            role="radiogroup"
+            aria-label="Kategori produk"
+            className="mt-1 flex flex-wrap gap-2"
           >
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
-              </option>
-            ))}
-          </select>
+            {CATEGORIES.map((cat) => {
+              const active = category === cat;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setCategory(cat)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
+                    active
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-100"
+                  }`}
+                >
+                  {cat}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1 text-xs text-gray-400">
+            Pilih kategori yang sesuai: Fisik (barang dikirim), Digital
+            (file/lisensi), atau Jasa (layanan).
+          </p>
         </div>
 
         {/* Gambar Produk (Multiple File Upload) */}
