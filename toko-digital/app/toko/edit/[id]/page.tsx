@@ -49,7 +49,7 @@ export default function TokoEditPage() {
         }
 
         if (active) {
-          setTitle(product.title);
+          setTitle(product.name);
           setDescription(product.description);
           setPrice(String(product.price));
           setCategory(product.category ?? CATEGORIES[0]);

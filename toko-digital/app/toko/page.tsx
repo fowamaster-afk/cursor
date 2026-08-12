@@ -175,7 +175,7 @@ export default function TokoDashboardPage() {
         {latestProduct ? (
           <div className="mt-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <p className="text-sm font-bold text-gray-900">
-              {latestProduct.title}
+              {latestProduct.name}
             </p>
             <p className="mt-1 text-sm text-gray-500">
               {formatRupiah(latestProduct.price)}

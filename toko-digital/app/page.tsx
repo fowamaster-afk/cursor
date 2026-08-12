@@ -4,21 +4,20 @@ import SearchBar from "@/components/SearchBar";
 import { getProducts } from "@/services/productService";
 
 interface HomePageProps {
-  searchParams: Promise<{ q?: string; category?: string }>;
+  searchParams: Promise<{ q?: string }>;
 }
 
 /**
- * Server Component - data diambil langsung di sisi server.
- * Pencarian (q) & kategori (category) dibaca dari URL search params (SEO-friendly),
+ * Server Component - data diambil langsung di sisi server (lebih cepat &
+ * SEO-friendly). Kata kunci pencarian (q) dibaca dari URL search params,
  * lalu diteruskan ke getProducts agar filter berjalan di sisi database.
  */
 export default async function Home({ searchParams }: HomePageProps) {
   // Next.js 15+ menjadikan searchParams sebagai Promise, jadi perlu di-await
   const params = await searchParams;
   const query = params.q;
-  const category = params.category;
 
-  const products = await getProducts(query, category);
+  const products = await getProducts(query);
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -37,8 +36,9 @@ export default async function Home({ searchParams }: HomePageProps) {
         <SearchBar />
 
         {products.length > 0 ? (
-          /* Grid produk dari database */
-          <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
+          /* Grid produk dari database:
+             1 kolom di HP, 2 kolom di tablet, 3-4 kolom di desktop */
+          <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {products.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}

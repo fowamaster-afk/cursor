@@ -7,12 +7,15 @@ import type { Product } from "@/types/product";
  */
 export interface ProductRow {
   id: string;
-  title: string;
+  name: string;
   description: string;
   price: number;
+  stock: number;
   image_url: string;
+  created_at?: string;
+  // Bidang lawas (opsional) - dipertahankan agar kode lama tetap kompilasi.
+  title?: string;
   image_urls?: string[];
-  created_at: string;
   category?: string;
   seller_wa?: string;
   user_id?: string;
@@ -20,24 +23,33 @@ export interface ProductRow {
 
 /** Payload untuk membuat produk baru. */
 export interface ProductCreateInput {
-  title: string;
+  /** Nama produk (kolom `name`). Alias `title` lawas tetap diterima & dipetakan. */
+  name?: string;
+  title?: string;
   description: string;
   price: number;
-  category: string;
-  seller_wa?: string;
+  /** Stok produk (kolom `stock`). Default 0 bila tidak disediakan. */
+  stock?: number;
   image_url: string;
+  // Bidang lawas (tidak ada di tabel saat ini) - diabaikan saat insert.
+  category?: string;
+  seller_wa?: string;
   image_urls?: string[];
-  user_id: string;
+  user_id?: string;
 }
 
 /** Payload untuk memperbarui produk. Semua field opsional. */
 export interface ProductUpdateInput {
+  name?: string;
+  /** Alias lawas - dipetakan ke kolom `name` saat update. */
   title?: string;
   description?: string;
   price?: number;
+  stock?: number;
+  image_url?: string;
+  // Bidang lawas (tidak ada di tabel saat ini) - diabaikan saat update.
   category?: string;
   seller_wa?: string;
-  image_url?: string;
   image_urls?: string[];
 }
 
@@ -47,10 +59,14 @@ export interface ProductUpdateInput {
 export function mapProduct(row: ProductRow): Product {
   return {
     id: row.id,
-    title: row.title,
+    name: row.name ?? row.title ?? "",
     description: row.description,
     price: row.price,
+    stock: row.stock ?? 0,
     imageUrl: row.image_url,
+    created_at: row.created_at,
+    // Alias lawas agar halaman lama yang masih membaca `title` tetap menampilkan nama.
+    title: row.title ?? row.name,
     image_urls: row.image_urls,
     category: row.category,
     seller_wa: row.seller_wa,
@@ -60,28 +76,22 @@ export function mapProduct(row: ProductRow): Product {
 
 /**
  * Mengambil produk dari tabel `products`, diurutkan berdasarkan created_at
- * terbaru. Mendukung filter opsional:
- * - `searchQuery`: pencarian tidak case-sensitive pada kolom title & description.
- * - `category`: filter berdasarkan kategori ('Semua' dilewati).
+ * terbaru. Mendukung pencarian opsional:
+ * - `searchQuery`: pencarian tidak case-sensitive pada kolom name & description.
+ *
+ * Catatan: tabel `products` saat ini hanya memiliki kolom
+ * id, name, description, price, stock, image_url, created_at.
  */
-export async function getProducts(
-  searchQuery?: string,
-  category?: string
-): Promise<Product[]> {
+export async function getProducts(searchQuery?: string): Promise<Product[]> {
   let builder = supabase
     .from("products")
-    .select("id, title, description, price, image_url, image_urls, created_at, category, seller_wa, user_id");
+    .select("id, name, description, price, stock, image_url, created_at");
 
-  // Filter kategori (abaikan jika undefined / 'Semua')
-  if (category && category !== "Semua") {
-    builder = builder.eq("category", category);
-  }
-
-  // Filter pencarian (tidak case-sensitive) pada title & description.
+  // Filter pencarian (tidak case-sensitive) pada name & description.
   // PostgREST `.or()` menggabungkan dua kondisi dengan OR; `%` = wildcard.
   if (searchQuery && searchQuery.trim() !== "") {
     const q = searchQuery.trim();
-    builder = builder.or(`title.ilike.%${q}%,description.ilike.%${q}%`);
+    builder = builder.or(`name.ilike.%${q}%,description.ilike.%${q}%`);
   }
 
   const { data, error } = await builder.order("created_at", {
@@ -107,7 +117,7 @@ export async function getProductById(id: string): Promise<Product | null> {
 
   const { data, error } = await supabase
     .from("products")
-    .select("id, title, description, price, image_url, image_urls, created_at, category, seller_wa, user_id")
+    .select("id, name, description, price, stock, image_url, created_at")
     .eq("id", id)
     .single();
 
@@ -124,9 +134,11 @@ export async function getProductById(id: string): Promise<Product | null> {
  * Dipakai di area Dashboard Toko untuk halaman "Produk Saya".
  */
 export async function getProductsByVendor(userId: string): Promise<Product[]> {
+  // Catatan: kolom `user_id` belum ada di tabel products saat ini, sehingga
+  // query ini akan error sampai kolom tersebut ditambahkan ke database.
   const { data, error } = await supabase
     .from("products")
-    .select("id, title, description, price, image_url, image_urls, created_at, category, seller_wa, user_id")
+    .select("id, name, description, price, stock, image_url, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -143,9 +155,11 @@ export async function getProductsByVendor(userId: string): Promise<Product[]> {
  * Mirror dari getProductsByVendor namun untuk etalase publik profil penjual.
  */
 export async function getProductsByAuthor(userId: string): Promise<Product[]> {
+  // Catatan: kolom `user_id` belum ada di tabel products saat ini, sehingga
+  // query ini akan error sampai kolom tersebut ditambahkan ke database.
   const { data, error } = await supabase
     .from("products")
-    .select("id, title, description, price, image_url, image_urls, created_at, category, seller_wa, user_id")
+    .select("id, name, description, price, stock, image_url, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -193,10 +207,20 @@ export async function uploadProductImages(files: File[]): Promise<string[]> {
 export async function createProduct(
   payload: ProductCreateInput
 ): Promise<Product> {
+  // Hanya kirim kolom yang benar-benar ada di tabel `products`.
+  // Alias `title` (legacy) dipetakan ke kolom `name`.
+  const insert: Record<string, unknown> = {
+    name: payload.name ?? payload.title ?? "",
+    description: payload.description,
+    price: payload.price,
+    stock: payload.stock ?? 0,
+    image_url: payload.image_url,
+  };
+
   const { data, error } = await supabase
     .from("products")
-    .insert(payload)
-    .select()
+    .insert(insert)
+    .select("id, name, description, price, stock, image_url, created_at")
     .single();
 
   if (error) {
@@ -230,16 +254,17 @@ export async function updateProduct(
   id: string,
   payload: ProductUpdateInput
 ): Promise<Product> {
-  // Hanya sertakan field yang disediakan agar tidak menimpa dengan undefined
+  // Hanya sertakan field yang disediakan agar tidak menimpa dengan undefined.
+  // Kolom lawas (category, seller_wa, image_urls) diabaikan karena belum ada
+  // di tabel `products`; alias `title` lama dipetakan ke kolom `name`.
   const updates: Record<string, unknown> = {};
-  if (payload.title !== undefined) updates.title = payload.title;
+  if (payload.name !== undefined) updates.name = payload.name;
+  else if (payload.title !== undefined) updates.name = payload.title;
   if (payload.description !== undefined)
     updates.description = payload.description;
   if (payload.price !== undefined) updates.price = payload.price;
-  if (payload.category !== undefined) updates.category = payload.category;
-  if (payload.seller_wa !== undefined) updates.seller_wa = payload.seller_wa;
+  if (payload.stock !== undefined) updates.stock = payload.stock;
   if (payload.image_url !== undefined) updates.image_url = payload.image_url;
-  if (payload.image_urls !== undefined) updates.image_urls = payload.image_urls;
 
   const { data, error } = await supabase
     .from("products")

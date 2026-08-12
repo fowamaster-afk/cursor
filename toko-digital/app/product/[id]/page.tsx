@@ -51,7 +51,7 @@ export default async function ProductPage({
   // Pesan profesional + tautan wa.me (encodeURIComponent diterapkan di builder).
   const waMessage = buildWhatsAppMessage({
     storeName,
-    productTitle: product.title,
+    productTitle: product.name,
     price: product.price,
     productUrl,
   });
@@ -87,7 +87,7 @@ export default async function ProductPage({
               </Link>
             </li>
             <li aria-hidden="true">/</li>
-            <li className="font-medium text-gray-900">{product.title}</li>
+            <li className="font-medium text-gray-900">{product.name}</li>
           </ol>
         </div>
       </nav>

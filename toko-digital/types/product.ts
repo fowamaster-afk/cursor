@@ -1,18 +1,31 @@
 /**
- * Type definitions for digital products
+ * Type definitions for digital products.
+ *
+ * Skema tabel `products` di Supabase saat ini:
+ * id, name, description, price, stock, image_url, created_at
  */
 export interface Product {
   id: string;
-  title: string;
+  /** Nama produk (kolom `name` di database). */
+  name: string;
   description: string;
   price: number;
+  /** Jumlah stok tersedia (kolom `stock` di database). */
+  stock: number;
+  /** URL gambar utama - dipetakan dari kolom `image_url`. */
   imageUrl: string;
-  /** Array URL gambar tambahan (opsional) untuk mendukung multiple images. */
+  /** Waktu pembuatan produk (kolom `created_at`). */
+  created_at?: string;
+
+  // --- Bidang lawas (opsional, hanya untuk kompatibilitas kode lama) ---
+  /** @deprecated Gunakan `name`. */
+  title?: string;
+  /** @deprecated Kolom image_urls belum ada di tabel saat ini. */
   image_urls?: string[];
-  /** Nomor WhatsApp penjual (opsional). Contoh: "6281234567890". */
+  /** @deprecated Kolom seller_wa belum ada di tabel saat ini. */
   seller_wa?: string;
-  /** Kategori produk (opsional). Contoh: "digital", "fisik", "jasa". */
+  /** @deprecated Kolom category belum ada di tabel saat ini. */
   category?: string;
-  /** ID user pemilik produk (opsional, relevan untuk toko). */
+  /** @deprecated Kolom user_id belum ada di tabel saat ini. */
   user_id?: string;
 }

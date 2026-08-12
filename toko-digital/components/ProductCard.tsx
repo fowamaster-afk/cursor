@@ -1,90 +1,70 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import type { Product } from "@/types/product";
-import FavoriteButton from "./FavoriteButton";
-import {
-  buildWhatsAppMessage,
-  buildWhatsAppUrl,
-  formatRupiah,
-  FALLBACK_WA_NUMBER,
-} from "@/lib/whatsapp";
+import { formatRupiah } from "@/lib/whatsapp";
 
 /**
- * Membangun URL WhatsApp dengan pesan pembelian profesional (COD).
- * Kartu produk belum memuat data profil penjual, sehingga nama toko
- * memakai fallback generik "toko Lokal".
- */
-function buildProductWhatsAppUrl(product: Product): string {
-  const waNumber = product.seller_wa?.trim() || FALLBACK_WA_NUMBER;
-  const productUrl = `${window.location.origin}/product/${product.id}`;
-  const message = buildWhatsAppMessage({
-    storeName: "toko Lokal",
-    productTitle: product.title,
-    price: product.price,
-    productUrl,
-  });
-
-  return buildWhatsAppUrl(waNumber, message);
-}
-
-/**
- * ProductCard - menampilkan satu produk digital, beli via WhatsApp (COD).
+ * ProductCard - kartu produk untuk etalase toko.
+ *
+ * Client Component (karena tombol "Tambah ke Keranjang" butuh interaksi),
+ * namun data produk tetap dikirim dari Server Component halaman, sehingga
+ * halaman tetap SEO-friendly & cepat (fetch dilakukan di server).
  */
 export default function ProductCard({ product }: { product: Product }) {
   /**
-   * Mengarahkan pembeli ke WhatsApp penjual untuk transaksi COD.
+   * Untuk saat ini hanya mencatat id produk ke konsol.
+   * Nanti di sini bisa dihubungkan ke keranjang (state global / database).
    */
-  const handleBuy = () => {
-    const url = buildProductWhatsAppUrl(product);
-    window.open(url, "_blank", "noopener,noreferrer");
+  const handleAddToCart = () => {
+    console.log("Tambah ke keranjang:", product.id);
   };
 
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      {/* Gambar produk (dapat diklik menuju detail) */}
-      <div className="relative block h-48 w-full overflow-hidden bg-gray-100">
-        <Link
-          href={`/product/${product.id}`}
-          className="absolute inset-0"
-          aria-label={`Lihat detail ${product.title}`}
-        >
-          <Image
-            src={product.imageUrl}
-            alt={product.title}
-            fill
-            className="object-cover transition duration-300 hover:opacity-80 group-hover:scale-105"
-            sizes="(max-width: 768px) 100vw, 33vw"
-          />
-        </Link>
-
-        {/* Tombol Hati (Favorit) di pojok kanan atas gambar */}
-        <FavoriteButton productId={product.id} />
-      </div>
+      {/* Gambar produk (dapat diklik menuju halaman detail) */}
+      <Link
+        href={`/product/${product.id}`}
+        className="relative block h-48 w-full overflow-hidden bg-gray-100"
+        aria-label={`Lihat detail ${product.name}`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={product.imageUrl}
+          alt={product.name}
+          loading="lazy"
+          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+        />
+      </Link>
 
       {/* Konten produk */}
       <div className="flex flex-1 flex-col p-5">
-        <Link
-          href={`/product/${product.id}`}
-          className="line-clamp-1 text-lg font-semibold text-gray-900 transition hover:text-blue-600"
-        >
-          {product.title}
-        </Link>
+        {/* Nama produk */}
+        <h3 className="line-clamp-1 text-lg font-semibold text-gray-900">
+          <Link
+            href={`/product/${product.id}`}
+            className="transition hover:text-indigo-600"
+          >
+            {product.name}
+          </Link>
+        </h3>
+
+        {/* Deskripsi singkat (dipotong jika terlalu panjang) */}
         <p className="mt-2 line-clamp-2 flex-1 text-sm text-gray-600">
           {product.description}
         </p>
 
-        <div className="mt-4 flex items-center justify-between">
+        {/* Harga (format Rupiah) + tombol tambah ke keranjang */}
+        <div className="mt-4 flex items-center justify-between gap-3">
           <span className="text-lg font-bold text-indigo-600">
             {formatRupiah(product.price)}
           </span>
           <button
             type="button"
-            onClick={handleBuy}
-            className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            onClick={handleAddToCart}
+            className="shrink-0 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
-            Beli
+            Tambah ke Keranjang
           </button>
         </div>
       </div>

@@ -98,7 +98,7 @@ export default function TokoProductsPage() {
               <div className="relative h-40 w-full bg-gray-100">
                 <Image
                   src={product.imageUrl}
-                  alt={product.title}
+                  alt={product.name}
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 100vw, 33vw"
@@ -114,7 +114,7 @@ export default function TokoProductsPage() {
                   </span>
                 </div>
                 <h3 className="mt-3 line-clamp-1 text-lg font-semibold text-gray-900">
-                  {product.title}
+                  {product.name}
                 </h3>
                 <div className="mt-4 flex items-center justify-between">
                   <div className="flex items-center gap-2">
