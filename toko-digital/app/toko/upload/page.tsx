@@ -21,6 +21,7 @@ export default function tokoUploadPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [stock, setStock] = useState("10");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [sellerWa, setSellerWa] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -79,6 +80,7 @@ export default function tokoUploadPage() {
         title,
         description,
         price: Number(price),
+        stock: Number(stock),
         category,
         seller_wa: sellerWa || undefined,
         image_url: imageUrls[0],
@@ -169,6 +171,28 @@ export default function tokoUploadPage() {
             placeholder="mis. 150000"
             className={inputClass}
           />
+        </div>
+
+        {/* Stok Produk */}
+        <div>
+          <label htmlFor="stock" className={labelClass}>
+            Stok Produk
+          </label>
+          <input
+            id="stock"
+            type="number"
+            min="0"
+            step="1"
+            value={stock}
+            onChange={(e) => setStock(e.target.value)}
+            required
+            placeholder="mis. 10"
+            className={inputClass}
+          />
+          <p className="mt-1 text-xs text-gray-400">
+            Jumlah barang yang tersedia. Jika 0, produk akan ditandai
+            "Stok Habis" di etalase.
+          </p>
         </div>
 
         {/* Kategori */}

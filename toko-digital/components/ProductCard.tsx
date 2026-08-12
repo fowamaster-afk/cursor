@@ -4,11 +4,21 @@ import Link from "next/link";
 import type { Product } from "@/types/product";
 import { formatRupiah } from "@/lib/whatsapp";
 
+/** Warna badge kategori produk di kartu. */
+function getCategoryBadgeClass(category: string): string {
+  const map: Record<string, string> = {
+    fisik: "bg-blue-600 text-white",
+    digital: "bg-purple-600 text-white",
+    jasa: "bg-amber-500 text-white",
+  };
+  return map[category.trim().toLowerCase()] ?? "bg-gray-600 text-white";
+}
+
 /**
  * ProductCard - kartu produk untuk etalase toko.
  *
- * Menampilkan gambar, nama, harga (Rupiah), deskripsi singkat, dan tombol
- * "Detail Produk" yang mengarah ke halaman /product/[id].
+ * Menampilkan gambar (dengan badge kategori), nama, harga (Rupiah), deskripsi
+ * singkat, dan tombol "Detail Produk" yang mengarah ke halaman /product/[id].
  *
  * Tetap berlabel Client Component karena komponen ini juga dirender di
  * dalam Client Components (mis. halaman favorit), namun data produk selalu
@@ -30,6 +40,15 @@ export default function ProductCard({ product }: { product: Product }) {
           loading="lazy"
           className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
         />
+
+        {/* Badge kategori produk (Fisik / Digital / Jasa) */}
+        {product.category && (
+          <span
+            className={`absolute left-2 top-2 z-10 rounded-full px-2.5 py-1 text-xs font-semibold shadow-sm ${getCategoryBadgeClass(product.category)}`}
+          >
+            {product.category}
+          </span>
+        )}
       </Link>
 
       {/* Konten produk */}

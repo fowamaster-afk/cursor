@@ -1,6 +1,44 @@
 import { supabase } from "./supabaseClient";
 import type { Product } from "@/types/product";
 
+/** Daftar kolom standar dari tabel `products`. */
+const PRODUCT_COLUMNS =
+  "id, name, description, price, stock, image_url, user_id, created_at";
+
+/** Sama dengan PRODUCT_COLUMNS, ditambah kolom `category`. */
+const PRODUCT_COLUMNS_WITH_CATEGORY =
+  "id, name, description, price, stock, image_url, user_id, category, created_at";
+
+/** Hasil cache: apakah kolom `category` sudah ada di tabel products. */
+let hasCategoryColumnCache: boolean | null = null;
+
+/** True jika error PostgREST karena sebuah kolom tidak ditemukan. */
+function isMissingColumnError(error: { message?: string } | null): boolean {
+  return error !== null && /does\s+not\s+exist/i.test(error.message ?? "");
+}
+
+/**
+ * Memeriksa apakah kolom `category` ada di tabel products.
+ * Hasilnya di-cache agar hanya dicek sekali per proses server.
+ */
+async function hasCategoryColumn(): Promise<boolean> {
+  if (hasCategoryColumnCache !== null) return hasCategoryColumnCache;
+  const { error } = await supabase.from("products").select("category").limit(1);
+  hasCategoryColumnCache = !isMissingColumnError(error);
+  return hasCategoryColumnCache;
+}
+
+/**
+ * Kolom SELECT yang dipakai query produk.
+ * Jika kolom `category` belum ada di database, query tanpa category agar
+ * aplikasi tetap berjalan (produk tampil sebagai "Tanpa Kategori").
+ */
+async function productSelect(): Promise<string> {
+  return (await hasCategoryColumn())
+    ? PRODUCT_COLUMNS_WITH_CATEGORY
+    : PRODUCT_COLUMNS;
+}
+
 /**
  * Raw row shape dari tabel `products` di Supabase.
  * Menggunakan snake_case karena sesuai dengan skema database (Postgres convention).
@@ -36,8 +74,9 @@ export interface ProductCreateInput {
    * WAJIB - diambil dari sesi pengguna yang sedang login.
    */
   user_id: string;
-  // Bidang lawas (tidak ada di tabel saat ini) - diabaikan saat insert.
+  /** Kategori produk (opsional): Fisik / Digital / Jasa. */
   category?: string;
+  // Bidang lawas (tidak ada di tabel saat ini) - diabaikan saat insert.
   seller_wa?: string;
   image_urls?: string[];
 }
@@ -51,8 +90,9 @@ export interface ProductUpdateInput {
   price?: number;
   stock?: number;
   image_url?: string;
-  // Bidang lawas (tidak ada di tabel saat ini) - diabaikan saat update.
+  /** Kategori produk (opsional): Fisik / Digital / Jasa. */
   category?: string;
+  // Bidang lawas (tidak ada di tabel saat ini) - diabaikan saat update.
   seller_wa?: string;
   image_urls?: string[];
 }
@@ -83,13 +123,13 @@ export function mapProduct(row: ProductRow): Product {
  * terbaru. Mendukung pencarian opsional:
  * - `searchQuery`: pencarian tidak case-sensitive pada kolom name & description.
  *
- * Catatan: tabel `products` saat ini hanya memiliki kolom
- * id, name, description, price, stock, image_url, created_at.
+ * Kolom `category` ikut diambil bila tersedia di database (digunakan untuk
+ * mengelompokkan etalase: Fisik / Digital / Jasa).
  */
 export async function getProducts(searchQuery?: string): Promise<Product[]> {
   let builder = supabase
     .from("products")
-    .select("id, name, description, price, stock, image_url, user_id, created_at");
+    .select(await productSelect());
 
   // Filter pencarian (tidak case-sensitive) pada name & description.
   // PostgREST `.or()` menggabungkan dua kondisi dengan OR; `%` = wildcard.
@@ -108,7 +148,9 @@ export async function getProducts(searchQuery?: string): Promise<Product[]> {
   }
 
   // Supabase mengembalikan data mentah; map ke Product domain.
-  return (data as ProductRow[]).map(mapProduct);
+  // Cast lewat `unknown` karena kolom SELECT dibuat dinamis (productSelect()),
+  // sehingga supabase-js tidak dapat menyimpulkan tipe kolom hasil query.
+  return (data as unknown as ProductRow[]).map(mapProduct);
 }
 
 /**
@@ -121,7 +163,7 @@ export async function getProductById(id: string): Promise<Product | null> {
 
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, description, price, stock, image_url, user_id, created_at")
+    .select(await productSelect())
     .eq("id", id)
     .single();
 
@@ -130,7 +172,7 @@ export async function getProductById(id: string): Promise<Product | null> {
     throw new Error(`Gagal mengambil produk: ${error.message}`);
   }
 
-  return data ? mapProduct(data as ProductRow) : null;
+  return data ? mapProduct(data as unknown as ProductRow) : null;
 }
 
 /**
@@ -142,7 +184,7 @@ export async function getProductsByVendor(userId: string): Promise<Product[]> {
   // hanya produk milik penjual yang sedang login.
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, description, price, stock, image_url, user_id, created_at")
+    .select(await productSelect())
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -152,7 +194,7 @@ export async function getProductsByVendor(userId: string): Promise<Product[]> {
     throw new Error(`Gagal mengambil produk toko: ${error.message}`);
   }
 
-  return (data as ProductRow[]).map(mapProduct);
+  return (data as unknown as ProductRow[]).map(mapProduct);
 }
 
 /**
@@ -164,7 +206,7 @@ export async function getProductsByAuthor(userId: string): Promise<Product[]> {
   // etalase publik untuk satu penjual/author.
   const { data, error } = await supabase
     .from("products")
-    .select("id, name, description, price, stock, image_url, user_id, created_at")
+    .select(await productSelect())
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
 
@@ -174,7 +216,7 @@ export async function getProductsByAuthor(userId: string): Promise<Product[]> {
     throw new Error(`Gagal mengambil produk penjual: ${error.message}`);
   }
 
-  return (data as ProductRow[]).map(mapProduct);
+  return (data as unknown as ProductRow[]).map(mapProduct);
 }
 
 /**
@@ -222,16 +264,21 @@ export async function createProduct(
     name: payload.name ?? payload.title ?? "",
     description: payload.description,
     price: payload.price,
-    stock: payload.stock ?? 0,
+    stock: payload.stock !== undefined ? Number(payload.stock) : 0,
     image_url: payload.image_url,
     // Pemilik produk: dikirim dari sesi login oleh halaman upload.
     user_id: payload.user_id,
   };
 
+  // Kolom `category` opsional: hanya dikirim jika kolomnya ada di database.
+  if (await hasCategoryColumn()) {
+    insert.category = payload.category ?? "";
+  }
+
   const { data, error } = await supabase
     .from("products")
     .insert(insert)
-    .select("id, name, description, price, stock, image_url, user_id, created_at")
+    .select(await productSelect())
     .single();
 
   if (error) {
@@ -242,7 +289,7 @@ export async function createProduct(
     throw new Error(`Gagal membuat produk: ${error.message}`);
   }
 
-  return mapProduct(data as ProductRow);
+  return mapProduct(data as unknown as ProductRow);
 }
 
 /**
@@ -269,8 +316,8 @@ export async function updateProduct(
   payload: ProductUpdateInput
 ): Promise<Product> {
   // Hanya sertakan field yang disediakan agar tidak menimpa dengan undefined.
-  // Kolom lawas (category, seller_wa, image_urls) diabaikan karena belum ada
-  // di tabel `products`; alias `title` lama dipetakan ke kolom `name`.
+  // Kolom lawas (seller_wa, image_urls) diabaikan karena belum ada di tabel
+  // `products`; alias `title` lama dipetakan ke kolom `name`.
   const updates: Record<string, unknown> = {};
   if (payload.name !== undefined) updates.name = payload.name;
   else if (payload.title !== undefined) updates.name = payload.title;
@@ -278,13 +325,16 @@ export async function updateProduct(
     updates.description = payload.description;
   if (payload.price !== undefined) updates.price = payload.price;
   if (payload.stock !== undefined) updates.stock = payload.stock;
+  if (payload.category !== undefined && (await hasCategoryColumn())) {
+    updates.category = payload.category;
+  }
   if (payload.image_url !== undefined) updates.image_url = payload.image_url;
 
   const { data, error } = await supabase
     .from("products")
     .update(updates)
     .eq("id", id)
-    .select()
+    .select(await productSelect())
     .single();
 
   if (error) {
@@ -292,5 +342,5 @@ export async function updateProduct(
     throw new Error(`Gagal memperbarui produk: ${error.message}`);
   }
 
-  return mapProduct(data as ProductRow);
+  return mapProduct(data as unknown as ProductRow);
 }
