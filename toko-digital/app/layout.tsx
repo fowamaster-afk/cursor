@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import SsoReceiver from "@/components/SsoReceiver";
 import "./globals.css";
 
-import { Analytics } from "@vercel/analytics/next"
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
